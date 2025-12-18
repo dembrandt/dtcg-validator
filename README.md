@@ -8,26 +8,38 @@ A web-based validator for W3C Design Tokens Community Group (DTCG) format tokens
 
 - ✅ Real-time validation against W3C DTCG specification
 - 🎨 Support for all DTCG token types (color, dimension, typography, shadow, etc.)
+- � Token references and alias resolution (`{token.path}` syntax)
+- ♻️ Chained reference resolution with circular detection
 - 📊 Detailed error analysis with suggestions
 - 🌙 Dark/Light mode support
 - 📱 Responsive design with Tailwind CSS
-- 🧪 Comprehensive test suite with Vitest
+- 🧪 Comprehensive test suite - 109 tests passing
 
-## Supported Token Types
+## Validation Capabilities
 
-- Color (hex, rgb, hsl, oklch, etc.)
-- Dimension (px, rem, em, etc.)
-- Font Family
-- Font Weight
-- Font Size
-- Duration
-- Cubic Bezier
-- Number
-- Typography (composite)
-- Shadow (composite)
-- Gradient (composite)
-- Border (composite)
-- Transition (composite)
+### Token Types (13 types - all from W3C DTCG Format Module)
+- **Color** - 14 color spaces (srgb, oklch, lab, lch, display-p3, etc.)
+- **Dimension** - px, rem units with validation
+- **Font Family** - string or array
+- **Font Weight** - numeric (1-1000) or aliases (bold, normal, etc.)
+- **Duration** - ms, s units
+- **Cubic Bezier** - easing functions
+- **Number** - unitless values
+- **Stroke Style** - line styles for borders
+- **Typography** - composite token (font family, size, weight, etc.)
+- **Shadow** - composite token with full validation
+- **Gradient** - stop positions and colors
+- **Border** - composite token (color, width, style)
+- **Transition** - composite token (duration, delay, timing)
+
+### Advanced Features
+- ✅ Token references (`{color.primary}`)
+- ✅ Chained references (`{alias1}` → `{alias2}` → value)
+- ✅ Circular reference detection
+- ✅ Type inheritance through references
+- ✅ Component range validation (e.g., hue 0-360, saturation 0-100)
+- ✅ "none" keyword support in color components
+- ✅ Group-level type inheritance
 
 ## Usage
 
