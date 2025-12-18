@@ -2,7 +2,7 @@
 
 A web-based validator for W3C Design Tokens Community Group (DTCG) format tokens. This tool helps designers and developers validate their design token files against the official DTCG specification.
 
-🔗 **[Live Demo](https://dembrandt.github.io/dtcg-validator/)**
+🔗 **[Live Demo](https://dembrandt.github.io/dtcg-validator/)** | 📦 **[GitHub Repository](https://github.com/dembrandt/dtcg-validator)**
 
 ## Features
 
