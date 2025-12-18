@@ -1532,4 +1532,340 @@ describe('DTCG Validator - W3C Spec Compliant', () => {
       expect(result.errors).toHaveLength(0);
     });
   });
+
+  describe('Token References (Aliases)', () => {
+    describe('Basic references', () => {
+      it('should validate simple color reference', () => {
+        const tokens = JSON.stringify({
+          color: {
+            base: {
+              $type: 'color',
+              $value: '#ff0000'
+            },
+            primary: {
+              $type: 'color',
+              $value: '{color.base}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+        expect(result.tokenCount).toBe(2);
+      });
+
+      it('should validate reference with nested groups', () => {
+        const tokens = JSON.stringify({
+          palette: {
+            brand: {
+              primary: {
+                $type: 'color',
+                $value: '#0066cc'
+              }
+            }
+          },
+          semantic: {
+            link: {
+              $type: 'color',
+              $value: '{palette.brand.primary}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+      });
+
+      it('should error on reference to non-existent token', () => {
+        const tokens = JSON.stringify({
+          color: {
+            primary: {
+              $type: 'color',
+              $value: '{color.nonexistent}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('non-existent'))).toBe(true);
+      });
+
+      it('should inherit type from referenced token', () => {
+        const tokens = JSON.stringify({
+          color: {
+            base: {
+              $type: 'color',
+              $value: '#ff0000'
+            },
+            alias: {
+              $value: '{color.base}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('Chained references', () => {
+      it('should resolve multi-level reference chains', () => {
+        const tokens = JSON.stringify({
+          color: {
+            base: {
+              $type: 'color',
+              $value: '#ff0000'
+            },
+            level1: {
+              $type: 'color',
+              $value: '{color.base}'
+            },
+            level2: {
+              $type: 'color',
+              $value: '{color.level1}'
+            },
+            level3: {
+              $type: 'color',
+              $value: '{color.level2}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+        expect(result.tokenCount).toBe(4);
+      });
+
+      it('should inherit type through reference chain', () => {
+        const tokens = JSON.stringify({
+          dimension: {
+            base: {
+              $type: 'dimension',
+              $value: { value: 16, unit: 'px' }
+            },
+            alias1: {
+              $value: '{dimension.base}'
+            },
+            alias2: {
+              $value: '{dimension.alias1}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('Circular references', () => {
+      it('should detect simple circular reference', () => {
+        const tokens = JSON.stringify({
+          color: {
+            a: {
+              $type: 'color',
+              $value: '{color.b}'
+            },
+            b: {
+              $type: 'color',
+              $value: '{color.a}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('Circular reference'))).toBe(true);
+      });
+
+      it('should detect multi-level circular reference', () => {
+        const tokens = JSON.stringify({
+          color: {
+            a: {
+              $type: 'color',
+              $value: '{color.b}'
+            },
+            b: {
+              $type: 'color',
+              $value: '{color.c}'
+            },
+            c: {
+              $type: 'color',
+              $value: '{color.a}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('Circular reference'))).toBe(true);
+      });
+
+      it('should detect self-reference', () => {
+        const tokens = JSON.stringify({
+          color: {
+            broken: {
+              $type: 'color',
+              $value: '{color.broken}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('Circular reference'))).toBe(true);
+      });
+    });
+
+    describe('Type inheritance through references', () => {
+      it('should validate dimension reference', () => {
+        const tokens = JSON.stringify({
+          spacing: {
+            base: {
+              $type: 'dimension',
+              $value: { value: 8, unit: 'px' }
+            },
+            small: {
+              $value: '{spacing.base}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+      });
+
+      it('should validate fontWeight reference', () => {
+        const tokens = JSON.stringify({
+          weight: {
+            normal: {
+              $type: 'fontWeight',
+              $value: 400
+            },
+            body: {
+              $value: '{weight.normal}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+      });
+
+      it('should work with group-level type inheritance', () => {
+        const tokens = JSON.stringify({
+          color: {
+            $type: 'color',
+            base: {
+              $value: '#ff0000'
+            },
+            primary: {
+              $value: '{color.base}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('References in composite tokens', () => {
+      it('should validate shadow with color reference', () => {
+        const tokens = JSON.stringify({
+          color: {
+            shadowColor: {
+              $type: 'color',
+              $value: '#00000080'
+            }
+          },
+          shadow: {
+            card: {
+              $type: 'shadow',
+              $value: {
+                color: '{color.shadowColor}',
+                offsetX: { value: 0, unit: 'px' },
+                offsetY: { value: 4, unit: 'px' },
+                blur: { value: 8, unit: 'px' },
+                spread: { value: 0, unit: 'px' }
+              }
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+      });
+
+      it('should validate border with multiple references', () => {
+        const tokens = JSON.stringify({
+          color: {
+            borderColor: {
+              $type: 'color',
+              $value: '#cccccc'
+            }
+          },
+          dimension: {
+            borderWidth: {
+              $type: 'dimension',
+              $value: { value: 1, unit: 'px' }
+            }
+          },
+          border: {
+            default: {
+              $type: 'border',
+              $value: {
+                color: '{color.borderColor}',
+                width: '{dimension.borderWidth}',
+                style: 'solid'
+              }
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('Reference validation edge cases', () => {
+      it('should accept malformed reference syntax as literal string for non-color types', () => {
+        const tokens = JSON.stringify({
+          text: {
+            value: {
+              $type: 'fontFamily',
+              $value: '{incomplete'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        // This should be valid since fontFamily can be any string
+        expect(result.valid).toBe(true);
+      });
+
+      it('should handle empty reference gracefully', () => {
+        const tokens = JSON.stringify({
+          color: {
+            broken: {
+              $type: 'color',
+              $value: '{}'
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(false);
+      });
+
+      it('should validate references across different type groups', () => {
+        const tokens = JSON.stringify({
+          base: {
+            size: {
+              $type: 'dimension',
+              $value: { value: 16, unit: 'px' }
+            }
+          },
+          typography: {
+            body: {
+              $type: 'typography',
+              $value: {
+                fontFamily: 'Arial',
+                fontSize: '{base.size}',
+                fontWeight: 400,
+                lineHeight: 1.5,
+                letterSpacing: { value: 0, unit: 'px' }
+              }
+            }
+          }
+        });
+        const result = validateTokens(tokens);
+        expect(result.valid).toBe(true);
+      });
+    });
+  });
 });

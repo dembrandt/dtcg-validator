@@ -452,22 +452,131 @@ function validateTypographyValue(value, path, errors, warnings) {
 }
 
 /**
+ * Checks if a value is a reference (matches {path} syntax)
+ * Note: {path} must have at least one character inside
+ */
+function isReference(value) {
+  return typeof value === 'string' && /^\{.+\}$/.test(value);
+}
+
+/**
+ * Extracts the path from a reference string
+ * e.g., "{color.primary}" => "color.primary"
+ */
+function extractReferencePath(reference) {
+  return reference.replace(/^\{|\}$/g, '');
+}
+
+/**
+ * Builds a registry of all tokens in the document
+ * Returns a Map where keys are paths and values are token objects
+ */
+function buildTokenRegistry(obj, path = '', registry = new Map(), parentType = null) {
+  for (const [key, value] of Object.entries(obj)) {
+    if (key.startsWith('$')) continue;
+
+    const currentPath = path ? `${path}.${key}` : key;
+
+    if (value && typeof value === 'object') {
+      if ('$value' in value) {
+        // This is a token - add to registry
+        const tokenType = value.$type || parentType;
+        registry.set(currentPath, {
+          ...value,
+          $type: tokenType,
+          $path: currentPath
+        });
+      } else {
+        // This is a group - check for group-level $type
+        const groupType = value.$type || parentType;
+        buildTokenRegistry(value, currentPath, registry, groupType);
+      }
+    }
+  }
+  return registry;
+}
+
+/**
+ * Resolves a reference to its final value
+ * Returns { value, type, error } where error is set if resolution failed
+ */
+function resolveReference(referencePath, registry, visitedPaths = new Set()) {
+  // Check for circular references
+  if (visitedPaths.has(referencePath)) {
+    return {
+      error: `Circular reference detected: ${Array.from(visitedPaths).join(' → ')} → ${referencePath}`
+    };
+  }
+
+  // Look up the token
+  const token = registry.get(referencePath);
+  if (!token) {
+    return {
+      error: `Reference "{${referencePath}}" points to non-existent token`
+    };
+  }
+
+  // Mark this path as visited
+  visitedPaths.add(referencePath);
+
+  // Check if the token's value is itself a reference
+  if (isReference(token.$value)) {
+    const nextPath = extractReferencePath(token.$value);
+    return resolveReference(nextPath, registry, visitedPaths);
+  }
+
+  // Return the resolved value and type
+  return {
+    value: token.$value,
+    type: token.$type
+  };
+}
+
+/**
  * Validates a token value based on its type
  */
-function validateTokenValue(token, path, errors, warnings) {
-  const type = token.$type;
+function validateTokenValue(token, path, errors, warnings, registry = null) {
+  let type = token.$type;
+
+  // Check for missing $value first
+  if (!('$value' in token)) {
+    errors.push(`Token at ${path} is missing $value`);
+    return;
+  }
+
+  let value = token.$value;
+
+  // Check if value is a reference
+  if (isReference(value)) {
+    if (registry) {
+      const referencePath = extractReferencePath(value);
+      const resolved = resolveReference(referencePath, registry);
+
+      if (resolved.error) {
+        errors.push(`${resolved.error} at ${path}`);
+        return;
+      }
+
+      // Use resolved value and type for validation
+      value = resolved.value;
+      if (!type) {
+        type = resolved.type;
+      }
+    } else {
+      // References are allowed but not validated if no registry provided
+      return;
+    }
+  }
 
   // Check for unknown $type
   if (type && !VALID_TOKEN_TYPES.includes(type)) {
     warnings.push(`Unknown $type "${type}" at ${path}`);
   }
 
-  if (!('$value' in token)) {
-    errors.push(`Token at ${path} is missing $value`);
+  if (!type) {
+    errors.push(`Token at ${path} has no determinable type (no $type property or group type)`);
     return;
   }
-
-  const value = token.$value;
 
   // Type-specific validation
   switch (type) {
@@ -530,7 +639,7 @@ function validateTokenValue(token, path, errors, warnings) {
 /**
  * Recursively validates tokens in an object
  */
-function validateToken(obj, path, errors, warnings) {
+function validateToken(obj, path, errors, warnings, registry = null, parentType = null) {
   for (const [key, value] of Object.entries(obj)) {
     const currentPath = path ? `${path}.${key}` : key;
 
@@ -544,14 +653,18 @@ function validateToken(obj, path, errors, warnings) {
       errors.push(`Token name "${key}" at ${currentPath} contains invalid characters ({, }, ., or ")`);
     }
 
-    // Check if this is a token (has $value or $type) or a group
+    // Check if this is a token (has $value) or a group
     if (value && typeof value === 'object') {
-      if ('$value' in value || '$type' in value) {
+      if ('$value' in value) {
         // This is a token - validate it
-        validateTokenValue(value, currentPath, errors, warnings);
+        validateTokenValue(value, currentPath, errors, warnings, registry);
+      } else if ('$type' in value && Object.keys(value).filter(k => !k.startsWith('$')).length === 0) {
+        // Object has $type but no $value and no child tokens/groups - invalid token
+        errors.push(`Token at ${currentPath} is missing $value`);
       } else {
-        // This is a group - recurse
-        validateToken(value, currentPath, errors, warnings);
+        // This is a group - check for group-level $type
+        const groupType = value.$type || parentType;
+        validateToken(value, currentPath, errors, warnings, registry, groupType);
       }
     }
   }
@@ -592,8 +705,11 @@ export function validateTokens(jsonString) {
       return { valid: false, errors: ['Root must be an object'] };
     }
 
+    // Build token registry for reference resolution
+    const registry = buildTokenRegistry(tokens);
+
     // Run validation
-    validateToken(tokens, '', errors, warnings);
+    validateToken(tokens, '', errors, warnings, registry);
 
     return {
       valid: errors.length === 0,
@@ -625,8 +741,11 @@ export function validateTokensObject(tokens) {
     return { valid: false, errors: ['Root must be an object'] };
   }
 
+  // Build token registry for reference resolution
+  const registry = buildTokenRegistry(tokens);
+
   // Run validation
-  validateToken(tokens, '', errors, warnings);
+  validateToken(tokens, '', errors, warnings, registry);
 
   return {
     valid: errors.length === 0,

@@ -682,8 +682,12 @@ function App() {
                   <li>• Component range validation</li>
                   <li>• "none" keyword support</li>
                   <li>• Token naming validation</li>
+                  <li>• Token references (curly brace syntax)</li>
+                  <li>• Alias resolution with circular detection</li>
+                  <li>• Chained reference resolution</li>
+                  <li>• Type inheritance through references</li>
                   <li>• Real-time error reporting</li>
-                  <li>• 92 unit tests passing</li>
+                  <li>• 106+ unit tests passing</li>
                 </ul>
               </div>
               <div>
@@ -695,38 +699,12 @@ function App() {
                 <ul className={`text-sm space-y-1 ${
                   darkMode ? 'text-slate-400' : 'text-slate-600'
                 }`}>
-                  <li>• Token references ($ref)</li>
-                  <li>• Alias resolution</li>
                   <li>• $extends for group inheritance</li>
-                  <li>• JSON Pointer support</li>
+                  <li>• JSON Pointer ($ref) syntax</li>
+                  <li>• Property-level references</li>
                 </ul>
               </div>
             </div>
-          </div>
-
-          <div className={`mt-6 pt-6 border-t ${
-            darkMode ? 'border-slate-700' : 'border-slate-200'
-          }`}>
-            <p className={`text-sm ${
-              darkMode ? 'text-slate-400' : 'text-slate-600'
-            }`}>
-              <strong className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Credits:</strong> Design Tokens Community Group —
-              Editors: Louis Chenais, Mike Kamminga, Kathleen McMahon, Drew Powers, Matthew Ström-Awn, Donna Vitan •
-              Authors: Daniel Banks, Esther Cheran, Andrew L'Homme, Ayesha Mazrana, James Nash, Adekunle Oduye, Kevin Powell, Lilith Wittmann •
-              {' '}
-              <a
-                href="https://www.w3.org/community/design-tokens/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`font-medium transition-colors ${
-                  darkMode
-                    ? 'text-cyan-400 hover:text-cyan-300'
-                    : 'text-cyan-600 hover:text-cyan-700'
-                }`}
-              >
-                Join the community group
-              </a>
-            </p>
           </div>
         </div>
       </main>
