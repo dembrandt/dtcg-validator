@@ -97,6 +97,15 @@ function App() {
     setTokenInput(invalidSample)
   }
 
+  const autoFixIndents = () => {
+    try {
+      const parsed = JSON.parse(tokenInput)
+      setTokenInput(JSON.stringify(parsed, null, 2))
+    } catch (e) {
+      // If JSON is invalid, can't autofix - silently ignore
+    }
+  }
+
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
       darkMode
@@ -203,6 +212,17 @@ function App() {
               }`}
             >
               Clear
+            </button>
+            <button
+              onClick={autoFixIndents}
+              className={`px-5 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+                darkMode
+                  ? 'bg-purple-900/50 hover:bg-purple-800/50 text-purple-300 border border-purple-700/50'
+                  : 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200'
+              }`}
+              title="Auto-format JSON with proper indentation"
+            >
+              Format JSON
             </button>
           </div>
 
