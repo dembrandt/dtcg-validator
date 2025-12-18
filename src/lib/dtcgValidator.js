@@ -1,0 +1,847 @@
+/**
+ * W3C Design Tokens Community Group (DTCG) Validator
+ * Validates design tokens against the W3C DTCG specification
+ * @see https://www.designtokens.org/TR/2025.10/format/
+ */
+
+/**
+ * Error categories for better classification
+ */
+const ERROR_CATEGORIES = {
+  STRUCTURE: 'structure',
+  TYPE: 'type',
+  VALUE: 'value',
+  NAMING: 'naming',
+  REFERENCE: 'reference'
+};
+
+/**
+ * Creates a structured error object
+ */
+function createError(message, path, category, suggestion = null) {
+  return {
+    message,
+    path,
+    category,
+    suggestion,
+    severity: 'error'
+  };
+}
+
+/**
+ * Creates a structured warning object
+ */
+function createWarning(message, path, category, suggestion = null) {
+  return {
+    message,
+    path,
+    category,
+    suggestion,
+    severity: 'warning'
+  };
+}
+
+/**
+ * Valid token types according to W3C DTCG spec
+ */
+const VALID_TOKEN_TYPES = [
+  'color',
+  'dimension',
+  'fontFamily',
+  'fontWeight',
+  'duration',
+  'cubicBezier',
+  'number',
+  'strokeStyle',
+  'border',
+  'transition',
+  'shadow',
+  'gradient',
+  'typography'
+];
+
+/**
+ * Valid font weight string aliases
+ */
+const FONT_WEIGHT_ALIASES = {
+  'thin': 100,
+  'hairline': 100,
+  'extra-light': 200,
+  'ultra-light': 200,
+  'light': 300,
+  'normal': 400,
+  'regular': 400,
+  'book': 400,
+  'medium': 500,
+  'semi-bold': 600,
+  'demi-bold': 600,
+  'bold': 700,
+  'extra-bold': 800,
+  'ultra-bold': 800,
+  'black': 900,
+  'heavy': 900,
+  'extra-black': 950,
+  'ultra-black': 950
+};
+
+/**
+ * Valid stroke style string values
+ */
+const STROKE_STYLE_VALUES = [
+  'solid',
+  'dashed',
+  'dotted',
+  'double',
+  'groove',
+  'ridge',
+  'outset',
+  'inset'
+];
+
+/**
+ * Valid color spaces and their component requirements
+ * Per W3C Design Tokens Color Module 2025.10
+ */
+const COLOR_SPACES = {
+  'srgb': { components: 3, ranges: [[0, 1], [0, 1], [0, 1]] },
+  'srgb-linear': { components: 3, ranges: [[0, 1], [0, 1], [0, 1]] },
+  'hsl': { components: 3, ranges: [[0, 360], [0, 100], [0, 100]] },
+  'hwb': { components: 3, ranges: [[0, 360], [0, 100], [0, 100]] },
+  'lab': { components: 3, ranges: [[0, 100], [-Infinity, Infinity], [-Infinity, Infinity]] },
+  'lch': { components: 3, ranges: [[0, 100], [0, Infinity], [0, 360]] },
+  'oklab': { components: 3, ranges: [[0, 1], [-Infinity, Infinity], [-Infinity, Infinity]] },
+  'oklch': { components: 3, ranges: [[0, 1], [0, Infinity], [0, 360]] },
+  'display-p3': { components: 3, ranges: [[0, 1], [0, 1], [0, 1]] },
+  'a98-rgb': { components: 3, ranges: [[0, 1], [0, 1], [0, 1]] },
+  'prophoto-rgb': { components: 3, ranges: [[0, 1], [0, 1], [0, 1]] },
+  'rec2020': { components: 3, ranges: [[0, 1], [0, 1], [0, 1]] },
+  'xyz-d65': { components: 3, ranges: [[-Infinity, Infinity], [-Infinity, Infinity], [-Infinity, Infinity]] },
+  'xyz-d50': { components: 3, ranges: [[-Infinity, Infinity], [-Infinity, Infinity], [-Infinity, Infinity]] }
+};
+
+/**
+ * Validates a color value per W3C Design Tokens Color Module
+ * Color can be:
+ * - String hex format: #rrggbb (no alpha in hex per spec)
+ * - Object format with colorSpace, components, optional alpha and hex
+ * - Reference: {token.path}
+ */
+function validateColorValue(value, path, errors, warnings) {
+  if (typeof value === 'string') {
+    // Allow hex colors and references
+    // Per color module: hex is 6-digit only (no alpha encoding)
+    if (!value.match(/^#[0-9a-fA-F]{6}$/) && !value.match(/^\{.+\}$/)) {
+      warnings.push(`Color at ${path} should be in 6-digit hex format (#rrggbb) or a reference`);
+    }
+  } else if (typeof value === 'object' && value !== null) {
+    // W3C color object format
+    if (!value.colorSpace) {
+      errors.push(`Color object at ${path} must have colorSpace property`);
+      return;
+    }
+
+    // Validate color space is supported
+    const colorSpaceInfo = COLOR_SPACES[value.colorSpace];
+    if (!colorSpaceInfo) {
+      errors.push(`Color at ${path} has unsupported colorSpace "${value.colorSpace}". Supported: ${Object.keys(COLOR_SPACES).join(', ')}`);
+      return;
+    }
+
+    // Validate components array
+    if (!Array.isArray(value.components)) {
+      errors.push(`Color object at ${path} must have components array`);
+      return;
+    }
+
+    if (value.components.length !== colorSpaceInfo.components) {
+      errors.push(`Color object at ${path} must have components array with exactly ${colorSpaceInfo.components} values`);
+      return;
+    }
+
+    // Validate each component
+    value.components.forEach((component, idx) => {
+      // Components can be numbers or "none" keyword
+      if (component !== 'none' && typeof component !== 'number') {
+        errors.push(`Color component at ${path}.components[${idx}] must be a number or "none"`);
+        return;
+      }
+
+      // Validate numeric component ranges
+      if (typeof component === 'number') {
+        const [min, max] = colorSpaceInfo.ranges[idx];
+
+        // Check if this is a hue component (0-360 exclusive)
+        const isHueComponent =
+          (value.colorSpace === 'hsl' && idx === 0) ||
+          (value.colorSpace === 'hwb' && idx === 0) ||
+          (value.colorSpace === 'lch' && idx === 2) ||
+          (value.colorSpace === 'oklch' && idx === 2);
+
+        if (isHueComponent) {
+          // Hue component (0-360 exclusive)
+          if (component < 0 || component >= 360) {
+            errors.push(`Color hue component at ${path}.components[${idx}] must be >= 0 and < 360`);
+          }
+        } else if (min !== -Infinity && max !== Infinity) {
+          // Other bounded components
+          if (component < min || component > max) {
+            errors.push(`Color component at ${path}.components[${idx}] must be between ${min} and ${max}`);
+          }
+        } else if (min !== -Infinity && max === Infinity) {
+          // Chroma-like components (>= 0)
+          if (component < min) {
+            errors.push(`Color component at ${path}.components[${idx}] must be >= ${min}`);
+          }
+        }
+        // Unbounded components (like a, b in lab) - no validation needed
+      }
+    });
+
+    // hex property is optional but should be 6-digit string if present
+    if (value.hex !== undefined) {
+      if (typeof value.hex !== 'string') {
+        errors.push(`Color hex property at ${path} must be a string`);
+      } else if (!value.hex.match(/^#[0-9a-fA-F]{6}$/)) {
+        errors.push(`Color hex property at ${path} must be 6-digit hex format (#rrggbb)`);
+      }
+    }
+
+    // alpha property is optional but must be [0-1] if present
+    if (value.alpha !== undefined) {
+      if (typeof value.alpha !== 'number') {
+        errors.push(`Color alpha property at ${path} must be a number`);
+      } else if (value.alpha < 0 || value.alpha > 1) {
+        errors.push(`Color alpha property at ${path} must be between 0 and 1`);
+      }
+    }
+  } else {
+    errors.push(`Color at ${path} must be a string or object`);
+  }
+}
+
+/**
+ * Validates a dimension value
+ * Must have unit "px" or "rem" per spec
+ */
+function validateDimensionValue(value, path, errors) {
+  if (typeof value === 'string') {
+    // String format: "16px", "1rem", etc.
+    if (!value.match(/^-?\d+(\.\d+)?(px|rem)$/) && !value.match(/^\{.+\}$/)) {
+      errors.push(`Dimension at ${path} must be a number with unit "px" or "rem" (e.g., "16px", "1rem") or a reference`);
+    }
+  } else if (typeof value === 'object' && value !== null) {
+    // Object format: { value: number, unit: "px" | "rem" }
+    if (typeof value.value !== 'number') {
+      errors.push(`Dimension object at ${path} must have numeric value property`);
+    }
+    if (value.unit !== 'px' && value.unit !== 'rem') {
+      errors.push(`Dimension unit at ${path} must be "px" or "rem"`);
+    }
+  } else if (typeof value !== 'number') {
+    errors.push(`Dimension at ${path} must be a number, string with unit, or object with value/unit properties`);
+  }
+}
+
+/**
+ * Validates a duration value
+ * Must have unit "ms" or "s"
+ */
+function validateDurationValue(value, path, errors) {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    if (typeof value.value !== 'number') {
+      errors.push(`Duration object at ${path} must have numeric value property`);
+    }
+    if (value.unit !== 'ms' && value.unit !== 's') {
+      errors.push(`Duration unit at ${path} must be "ms" or "s"`);
+    }
+  } else {
+    errors.push(`Duration at ${path} must be an object with value and unit properties`);
+  }
+}
+
+/**
+ * Validates a cubic bezier value
+ * Must be array of 4 numbers: [P1x, P1y, P2x, P2y]
+ * P1x and P2x must be in range [0, 1]
+ */
+function validateCubicBezierValue(value, path, errors) {
+  if (!Array.isArray(value) || value.length !== 4) {
+    errors.push(`cubicBezier at ${path} must be an array of exactly 4 numbers`);
+    return;
+  }
+
+  value.forEach((num, idx) => {
+    if (typeof num !== 'number') {
+      errors.push(`cubicBezier at ${path}[${idx}] must be a number`);
+    }
+  });
+
+  // X coordinates (indices 0 and 2) must be in [0, 1]
+  if (typeof value[0] === 'number' && (value[0] < 0 || value[0] > 1)) {
+    errors.push(`cubicBezier at ${path}[0] (P1x) must be in range [0, 1]`);
+  }
+  if (typeof value[2] === 'number' && (value[2] < 0 || value[2] > 1)) {
+    errors.push(`cubicBezier at ${path}[2] (P2x) must be in range [0, 1]`);
+  }
+}
+
+/**
+ * Validates a stroke style value
+ * Can be string enum or object with dashArray and lineCap
+ */
+function validateStrokeStyleValue(value, path, errors) {
+  if (typeof value === 'string') {
+    if (!STROKE_STYLE_VALUES.includes(value)) {
+      errors.push(`strokeStyle at ${path} must be one of: ${STROKE_STYLE_VALUES.join(', ')}`);
+    }
+  } else if (typeof value === 'object' && value !== null) {
+    // Object format
+    if (!value.dashArray) {
+      errors.push(`strokeStyle object at ${path} must have dashArray property`);
+    } else if (!Array.isArray(value.dashArray)) {
+      errors.push(`strokeStyle dashArray at ${path} must be an array`);
+    }
+
+    if (!value.lineCap) {
+      errors.push(`strokeStyle object at ${path} must have lineCap property`);
+    } else if (!['round', 'butt', 'square'].includes(value.lineCap)) {
+      errors.push(`strokeStyle lineCap at ${path} must be "round", "butt", or "square"`);
+    }
+  } else {
+    errors.push(`strokeStyle at ${path} must be a string or object`);
+  }
+}
+
+/**
+ * Validates a border value
+ * Must have color, width, and style properties
+ */
+function validateBorderValue(value, path, errors) {
+  if (typeof value !== 'object' || value === null) {
+    errors.push(`Border at ${path} must be an object`);
+    return;
+  }
+
+  if (!value.color) {
+    errors.push(`Border at ${path} must have color property`);
+  }
+
+  if (!value.width) {
+    errors.push(`Border at ${path} must have width property`);
+  }
+
+  if (!value.style) {
+    errors.push(`Border at ${path} must have style property`);
+  }
+}
+
+/**
+ * Validates a transition value
+ * Must have duration, delay, and timingFunction properties
+ */
+function validateTransitionValue(value, path, errors) {
+  if (typeof value !== 'object' || value === null) {
+    errors.push(`Transition at ${path} must be an object`);
+    return;
+  }
+
+  if (!value.duration) {
+    errors.push(`Transition at ${path} must have duration property`);
+  }
+
+  if (!value.delay) {
+    errors.push(`Transition at ${path} must have delay property`);
+  }
+
+  if (!value.timingFunction) {
+    errors.push(`Transition at ${path} must have timingFunction property`);
+  }
+}
+
+/**
+ * Validates a shadow value
+ * Can be single shadow object or array of shadow objects
+ * Each shadow must have: color, offsetX, offsetY, blur, spread
+ * Optional: inset (boolean)
+ */
+function validateShadowValue(value, path, errors) {
+  const validateSingleShadow = (shadow, shadowPath) => {
+    if (typeof shadow !== 'object' || shadow === null) {
+      errors.push(`Shadow at ${shadowPath} must be an object`);
+      return;
+    }
+
+    const required = ['offsetX', 'offsetY', 'blur', 'spread', 'color'];
+    for (const field of required) {
+      if (!(field in shadow)) {
+        errors.push(`Shadow at ${shadowPath} is missing required field: ${field}`);
+      }
+    }
+
+    // inset is optional but must be boolean if present
+    if (shadow.inset !== undefined && typeof shadow.inset !== 'boolean') {
+      errors.push(`Shadow inset property at ${shadowPath} must be a boolean`);
+    }
+  };
+
+  if (Array.isArray(value)) {
+    // Array of shadows
+    value.forEach((shadow, idx) => {
+      validateSingleShadow(shadow, `${path}[${idx}]`);
+    });
+  } else {
+    // Single shadow
+    validateSingleShadow(value, path);
+  }
+}
+
+/**
+ * Validates a gradient value
+ * Must be array of gradient stops
+ * Each stop must have: color, position (number in [0, 1])
+ */
+function validateGradientValue(value, path, errors) {
+  if (!Array.isArray(value)) {
+    errors.push(`Gradient at ${path} must be an array of gradient stops`);
+    return;
+  }
+
+  value.forEach((stop, idx) => {
+    if (typeof stop !== 'object' || stop === null) {
+      errors.push(`Gradient stop at ${path}[${idx}] must be an object`);
+      return;
+    }
+
+    if (!('color' in stop)) {
+      errors.push(`Gradient stop at ${path}[${idx}] must have color property`);
+    }
+
+    if (!('position' in stop)) {
+      errors.push(`Gradient stop at ${path}[${idx}] must have position property`);
+    } else if (typeof stop.position !== 'number') {
+      errors.push(`Gradient stop position at ${path}[${idx}] must be a number`);
+    }
+  });
+}
+
+/**
+ * Validates a typography value
+ * Must have: fontFamily, fontSize, fontWeight, letterSpacing, lineHeight
+ */
+function validateTypographyValue(value, path, errors, warnings) {
+  if (typeof value !== 'object' || value === null) {
+    errors.push(`Typography at ${path} must be an object`);
+    return;
+  }
+
+  // Required fields per spec
+  const required = ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'lineHeight'];
+  for (const field of required) {
+    if (!(field in value)) {
+      errors.push(`Typography at ${path} is missing required field: ${field}`);
+    }
+  }
+
+  // Warn about unknown fields
+  const allowedFields = required;
+  for (const field of Object.keys(value)) {
+    if (!allowedFields.includes(field)) {
+      warnings.push(`Typography at ${path} has unknown field: ${field}`);
+    }
+  }
+}
+
+/**
+ * Validates a token value based on its type
+ */
+function validateTokenValue(token, path, errors, warnings) {
+  const type = token.$type;
+
+  // Check for unknown $type
+  if (type && !VALID_TOKEN_TYPES.includes(type)) {
+    warnings.push(`Unknown $type "${type}" at ${path}`);
+  }
+
+  if (!('$value' in token)) {
+    errors.push(`Token at ${path} is missing $value`);
+    return;
+  }
+
+  const value = token.$value;
+
+  // Type-specific validation
+  switch (type) {
+    case 'color':
+      validateColorValue(value, path, errors, warnings);
+      break;
+    case 'dimension':
+      validateDimensionValue(value, path, errors);
+      break;
+    case 'fontFamily':
+      if (typeof value !== 'string' && !Array.isArray(value)) {
+        errors.push(`fontFamily at ${path} must be a string or array`);
+      }
+      break;
+    case 'fontWeight':
+      if (typeof value === 'number') {
+        if (value < 1 || value > 1000) {
+          errors.push(`fontWeight at ${path} must be a number between 1-1000`);
+        }
+      } else if (typeof value === 'string') {
+        if (!FONT_WEIGHT_ALIASES.hasOwnProperty(value)) {
+          errors.push(`fontWeight at ${path} must be a valid weight alias (e.g., "bold", "normal") or a number between 1-1000`);
+        }
+      } else {
+        errors.push(`fontWeight at ${path} must be a number or string`);
+      }
+      break;
+    case 'duration':
+      validateDurationValue(value, path, errors);
+      break;
+    case 'cubicBezier':
+      validateCubicBezierValue(value, path, errors);
+      break;
+    case 'number':
+      if (typeof value !== 'number') {
+        errors.push(`number at ${path} must be a number`);
+      }
+      break;
+    case 'strokeStyle':
+      validateStrokeStyleValue(value, path, errors);
+      break;
+    case 'border':
+      validateBorderValue(value, path, errors);
+      break;
+    case 'transition':
+      validateTransitionValue(value, path, errors);
+      break;
+    case 'shadow':
+      validateShadowValue(value, path, errors);
+      break;
+    case 'gradient':
+      validateGradientValue(value, path, errors);
+      break;
+    case 'typography':
+      validateTypographyValue(value, path, errors, warnings);
+      break;
+  }
+}
+
+/**
+ * Recursively validates tokens in an object
+ */
+function validateToken(obj, path, errors, warnings) {
+  for (const [key, value] of Object.entries(obj)) {
+    const currentPath = path ? `${path}.${key}` : key;
+
+    // Skip special keys
+    if (key.startsWith('$')) {
+      continue;
+    }
+
+    // Check for invalid characters in token names
+    if (/[{}."]/.test(key)) {
+      errors.push(`Token name "${key}" at ${currentPath} contains invalid characters ({, }, ., or ")`);
+    }
+
+    // Check if this is a token (has $value or $type) or a group
+    if (value && typeof value === 'object') {
+      if ('$value' in value || '$type' in value) {
+        // This is a token - validate it
+        validateTokenValue(value, currentPath, errors, warnings);
+      } else {
+        // This is a group - recurse
+        validateToken(value, currentPath, errors, warnings);
+      }
+    }
+  }
+}
+
+/**
+ * Counts the total number of tokens in a token tree
+ */
+function countTokens(obj, count = 0) {
+  for (const [key, value] of Object.entries(obj)) {
+    if (key.startsWith('$')) continue;
+    if (value && typeof value === 'object') {
+      if ('$value' in value) {
+        count++;
+      } else {
+        count = countTokens(value, count);
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * Validates a design tokens JSON string against the W3C DTCG specification
+ */
+export function validateTokens(jsonString) {
+  if (!jsonString || typeof jsonString !== 'string' || !jsonString.trim()) {
+    return { valid: false, errors: ['Input is empty'] };
+  }
+
+  try {
+    const tokens = JSON.parse(jsonString);
+    const errors = [];
+    const warnings = [];
+
+    // Validate root structure
+    if (typeof tokens !== 'object' || tokens === null || Array.isArray(tokens)) {
+      return { valid: false, errors: ['Root must be an object'] };
+    }
+
+    // Run validation
+    validateToken(tokens, '', errors, warnings);
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings,
+      tokenCount: countTokens(tokens)
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      errors: [`Invalid JSON: ${error.message}`]
+    };
+  }
+}
+
+/**
+ * Validates a design tokens object (already parsed) against the W3C DTCG specification
+ */
+export function validateTokensObject(tokens) {
+  if (!tokens) {
+    return { valid: false, errors: ['Input is empty'] };
+  }
+
+  const errors = [];
+  const warnings = [];
+
+  // Validate root structure
+  if (typeof tokens !== 'object' || tokens === null || Array.isArray(tokens)) {
+    return { valid: false, errors: ['Root must be an object'] };
+  }
+
+  // Run validation
+  validateToken(tokens, '', errors, warnings);
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    tokenCount: countTokens(tokens)
+  };
+}
+
+/**
+ * Analyzes validation errors and provides detailed insights with suggestions
+ */
+export function analyzeErrors(validationResult) {
+  if (!validationResult.errors || validationResult.errors.length === 0) {
+    return {
+      ...validationResult,
+      analysis: {
+        summary: 'No errors found',
+        categories: {},
+        suggestions: []
+      }
+    };
+  }
+
+  const analysis = {
+    categories: {
+      structure: [],
+      type: [],
+      value: [],
+      naming: [],
+      reference: []
+    },
+    suggestions: []
+  };
+
+  // Analyze each error
+  validationResult.errors.forEach((error, index) => {
+    const analyzed = analyzeError(error, index + 1);
+    analysis.categories[analyzed.category].push(analyzed);
+    if (analyzed.suggestion) {
+      analysis.suggestions.push(analyzed.suggestion);
+    }
+  });
+
+  // Create summary
+  const errorCounts = Object.entries(analysis.categories)
+    .filter(([_, errors]) => errors.length > 0)
+    .map(([category, errors]) => `${errors.length} ${category}`)
+    .join(', ');
+
+  analysis.summary = `Found ${validationResult.errors.length} error(s): ${errorCounts}`;
+
+  return {
+    ...validationResult,
+    analysis
+  };
+}
+
+/**
+ * Analyzes a single error and provides category, context, and suggestions
+ */
+function analyzeError(errorMessage, errorNumber) {
+  const error = {
+    number: errorNumber,
+    message: errorMessage,
+    category: 'value',
+    path: extractPath(errorMessage),
+    suggestion: null,
+    details: null
+  };
+
+  // Categorize and add suggestions based on error patterns
+  if (errorMessage.includes('Invalid JSON')) {
+    error.category = 'structure';
+    error.suggestion = 'Check for missing commas, brackets, or quotes. Use a JSON validator to find syntax errors.';
+    error.details = 'The input is not valid JSON. Common issues include trailing commas, unquoted keys, or mismatched brackets.';
+  } else if (errorMessage.includes('Root must be an object')) {
+    error.category = 'structure';
+    error.suggestion = 'Wrap your tokens in a JSON object with curly braces: { "color": { ... } }';
+    error.details = 'Design tokens must be defined within a root object, not as an array or primitive value.';
+  } else if (errorMessage.includes('Input is empty')) {
+    error.category = 'structure';
+    error.suggestion = 'Paste your design tokens JSON into the editor.';
+    error.details = 'No input was provided for validation.';
+  } else if (errorMessage.includes('missing $value')) {
+    error.category = 'structure';
+    error.suggestion = `Add a "$value" property to the token at ${error.path}. Example: "$value": "#ff0000"`;
+    error.details = 'All tokens must have a $value property that contains the actual token value.';
+  } else if (errorMessage.includes('Unknown $type')) {
+    error.category = 'type';
+    const match = errorMessage.match(/"([^"]+)"/);
+    if (match) {
+      error.suggestion = `Change "$type": "${match[1]}" to one of: ${VALID_TOKEN_TYPES.join(', ')}`;
+    }
+    error.details = 'The $type must be one of the 13 supported token types defined in the DTCG Format Module.';
+  } else if (errorMessage.includes('contains invalid characters')) {
+    error.category = 'naming';
+    error.suggestion = 'Token names cannot contain dots (.), curly braces ({ }), or quotes ("). Use hyphens or underscores instead.';
+    error.details = 'Token names must follow DTCG naming conventions: alphanumeric, hyphens, and underscores only.';
+  } else if (errorMessage.includes('colorSpace')) {
+    error.category = 'value';
+    if (errorMessage.includes('must have colorSpace')) {
+      error.suggestion = `Add "colorSpace" property. Example: "colorSpace": "srgb"`;
+    } else if (errorMessage.includes('unsupported colorSpace')) {
+      const supportedSpaces = Object.keys(COLOR_SPACES).join(', ');
+      error.suggestion = `Use one of the 14 supported color spaces: ${supportedSpaces}`;
+    }
+    error.details = 'Color tokens using object format must specify a valid colorSpace from the Color Module 2025.10.';
+  } else if (errorMessage.includes('components')) {
+    error.category = 'value';
+    if (errorMessage.includes('must have components array')) {
+      error.suggestion = 'Add "components" array with color values. Example: "components": [1, 0, 0] for red in sRGB.';
+    } else if (errorMessage.includes('exactly 3 values')) {
+      error.suggestion = 'Color components must be an array of exactly 3 numeric values or "none".';
+    } else if (errorMessage.includes('must be a number or "none"')) {
+      error.suggestion = 'Each component must be either a number or the string "none".';
+    } else if (errorMessage.includes('must be between')) {
+      const match = errorMessage.match(/between ([\d.]+) and ([\d.]+)/);
+      if (match) {
+        error.suggestion = `Component value must be in range [${match[1]}, ${match[2]}]. Check the color space requirements.`;
+      }
+    } else if (errorMessage.includes('must be >= 0 and < 360')) {
+      error.suggestion = 'Hue values must be in the range [0, 360) - note that 360 is NOT valid, use 0 instead for a full rotation.';
+    }
+    error.details = 'Color components must conform to the range requirements of their color space.';
+  } else if (errorMessage.includes('alpha')) {
+    error.category = 'value';
+    error.suggestion = 'Alpha must be a number between 0 and 1, where 0 is fully transparent and 1 is fully opaque.';
+    error.details = 'The alpha channel controls opacity and must be a numeric value in the range [0, 1].';
+  } else if (errorMessage.includes('fontWeight')) {
+    error.category = 'value';
+    if (errorMessage.includes('between 1-1000')) {
+      error.suggestion = `Use a numeric weight between 1-1000, or use an alias like: ${Object.keys(FONT_WEIGHT_ALIASES).slice(0, 5).join(', ')}, etc.`;
+    } else if (errorMessage.includes('valid weight alias')) {
+      error.suggestion = `Use one of these aliases: ${Object.keys(FONT_WEIGHT_ALIASES).join(', ')}`;
+    }
+    error.details = 'Font weight must be a number 1-1000 or a recognized weight alias.';
+  } else if (errorMessage.includes('dimension') && errorMessage.includes('unit')) {
+    error.category = 'value';
+    error.suggestion = 'Dimension units must be "px" or "rem" per the DTCG Format Module 2025.10.';
+    error.details = 'The specification only allows "px" and "rem" units for dimensions.';
+  } else if (errorMessage.includes('duration') && errorMessage.includes('unit')) {
+    error.category = 'value';
+    error.suggestion = 'Duration units must be "ms" (milliseconds) or "s" (seconds).';
+    error.details = 'Duration values must use milliseconds or seconds as the unit.';
+  } else if (errorMessage.includes('cubicBezier')) {
+    error.category = 'value';
+    if (errorMessage.includes('exactly 4 numbers')) {
+      error.suggestion = 'cubicBezier must be an array of 4 numbers: [P1x, P1y, P2x, P2y]. Example: [0.42, 0, 0.58, 1]';
+    } else if (errorMessage.includes('must be in range [0, 1]')) {
+      error.suggestion = 'X coordinates (P1x and P2x) must be between 0 and 1. Y coordinates can be any value.';
+    }
+    error.details = 'Cubic bezier values define easing curves with control points.';
+  } else if (errorMessage.includes('Shadow') && errorMessage.includes('missing required field')) {
+    error.category = 'structure';
+    const match = errorMessage.match(/field: (\w+)/);
+    if (match) {
+      error.suggestion = `Add the "${match[1]}" property to your shadow object. Shadows require: offsetX, offsetY, blur, spread, and color.`;
+    }
+    error.details = 'Shadow tokens must have all required fields: offsetX, offsetY, blur, spread, and color. Inset is optional.';
+  } else if (errorMessage.includes('Typography') && errorMessage.includes('missing required field')) {
+    error.category = 'structure';
+    const match = errorMessage.match(/field: (\w+)/);
+    if (match) {
+      error.suggestion = `Add the "${match[1]}" property. Typography requires: fontFamily, fontSize, fontWeight, lineHeight, and letterSpacing.`;
+    }
+    error.details = 'Typography tokens must have all 5 required fields per the Format Module.';
+  } else if (errorMessage.includes('strokeStyle')) {
+    error.category = 'value';
+    error.suggestion = `Use one of: ${STROKE_STYLE_VALUES.join(', ')}, or provide an object with dashArray and optional lineCap.`;
+    error.details = 'Stroke style can be a predefined string or a custom object with dash patterns.';
+  } else if (errorMessage.includes('Gradient')) {
+    error.category = 'value';
+    if (errorMessage.includes('must be an array')) {
+      error.suggestion = 'Gradients must be an array of stops. Example: [{"color": "#000", "position": 0}, {"color": "#fff", "position": 1}]';
+    } else if (errorMessage.includes('must have color property')) {
+      error.suggestion = 'Each gradient stop must have a "color" property.';
+    } else if (errorMessage.includes('must have position property')) {
+      error.suggestion = 'Each gradient stop must have a "position" property (typically 0 to 1).';
+    }
+    error.details = 'Gradients are arrays of color stops, each with a color and position.';
+  } else if (errorMessage.includes('Border') && errorMessage.includes('must have')) {
+    error.category = 'structure';
+    const match = errorMessage.match(/must have (\w+) property/);
+    if (match) {
+      error.suggestion = `Add the "${match[1]}" property. Border requires: color, width, and style.`;
+    }
+    error.details = 'Border tokens are composite types requiring color, width, and style properties.';
+  } else if (errorMessage.includes('Transition') && errorMessage.includes('must have')) {
+    error.category = 'structure';
+    const match = errorMessage.match(/must have (\w+) property/);
+    if (match) {
+      error.suggestion = `Add the "${match[1]}" property. Transition requires: duration, delay, and timingFunction.`;
+    }
+    error.details = 'Transition tokens define animation timing with duration, delay, and easing.';
+  }
+
+  return error;
+}
+
+/**
+ * Extracts the token path from an error message
+ */
+function extractPath(errorMessage) {
+  // Try to find "at <path>" pattern
+  const atMatch = errorMessage.match(/at ([\w.\[\]]+)/);
+  if (atMatch) {
+    return atMatch[1];
+  }
+
+  // Try to find path in quotes
+  const quoteMatch = errorMessage.match(/"([\w.]+)"/);
+  if (quoteMatch && !quoteMatch[1].includes(' ')) {
+    return quoteMatch[1];
+  }
+
+  return 'root';
+}
