@@ -544,18 +544,18 @@ function App() {
             </h2>
             <div className={`p-4 rounded-lg mb-6 border ${
               darkMode
-                ? 'bg-amber-950/30 border-amber-800/50'
-                : 'bg-amber-50 border-amber-200'
+                ? 'bg-blue-950/30 border-blue-800/50'
+                : 'bg-blue-50 border-blue-200'
             }`}>
               <p className={`text-sm font-medium flex items-start gap-2 ${
-                darkMode ? 'text-amber-300' : 'text-amber-900'
+                darkMode ? 'text-blue-300' : 'text-blue-900'
               }`}>
                 <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
                 <span>
-                  <strong>Experimental Implementation:</strong> This is an independent attempt to implement the Design Tokens Community Group draft specification (2025.10).
-                  The spec itself states "Do not attempt to implement this version" as it's a preview draft, but this project exists to explore and test the specification.
+                  <strong>Specification Version:</strong> This validator implements the W3C Design Tokens Community Group specification version 2025.10, which is stable and recommended for implementation.
+                  Future versions may introduce breaking changes, but this version provides a solid foundation for design token validation.
                 </span>
               </p>
             </div>
@@ -759,7 +759,7 @@ function App() {
           <p className={`text-center text-sm ${
             darkMode ? 'text-slate-500' : 'text-slate-600'
           }`}>
-            Experimental validator implementing DTCG Draft 2025.10 • Built with React + Vite + Tailwind CSS • 92 unit tests passing
+            Implementing DTCG Specification 2025.10 • Built with React + Vite + Tailwind CSS • 109 unit tests passing
           </p>
         </div>
       </footer>
