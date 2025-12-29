@@ -91,7 +91,13 @@ npm run deploy
 
 ## DTCG Specification
 
-This validator follows the [W3C Design Tokens Community Group specification](https://www.designtokens.org/TR/2025.10/format/).
+This validator implements the [W3C Design Tokens Community Group specification version 2025.10](https://www.designtokens.org/TR/2025.10/format/), which is stable and recommended for implementation.
+
+### Project Status
+
+This is an **independent, community-driven implementation** of the DTCG specification. It is not an official W3C or Design Tokens Community Group project.
+
+The validator aims to help designers and developers validate their design tokens against the stable 2025.10 version of the specification. While the spec may evolve in future versions, this implementation provides a solid foundation for working with design tokens today.
 
 ## License
 
