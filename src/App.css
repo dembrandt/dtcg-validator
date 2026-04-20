@@ -1,27 +1,3 @@
-/* DTCG Validator */
+/* Custom styles for the DTCG Validator */
 
-:root {
-  --font-mono: 'Geist Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.25); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(128,128,128,0.4); }
-
-/* Textarea */
-textarea {
-  font-family: var(--font-mono);
-  caret-color: #3b82f6;
-}
-
-textarea:focus { outline: none; }
-
-button, a, [role="button"] { cursor: pointer; }
-
-/* Focus visible */
-*:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
+/* You can add any custom CSS here if needed */
