@@ -535,8 +535,8 @@ function resolveReference(referencePath, registry, visitedPaths = new Set()) {
 /**
  * Validates a token value based on its type
  */
-function validateTokenValue(token, path, errors, warnings, registry = null) {
-  let type = token.$type;
+function validateTokenValue(token, path, errors, warnings, registry = null, parentType = null) {
+  let type = token.$type || parentType;
 
   // Check for missing $value first
   if (!('$value' in token)) {
@@ -657,7 +657,7 @@ function validateToken(obj, path, errors, warnings, registry = null, parentType 
     if (value && typeof value === 'object') {
       if ('$value' in value) {
         // This is a token - validate it
-        validateTokenValue(value, currentPath, errors, warnings, registry);
+        validateTokenValue(value, currentPath, errors, warnings, registry, parentType);
       } else if ('$type' in value && Object.keys(value).filter(k => !k.startsWith('$')).length === 0) {
         // Object has $type but no $value and no child tokens/groups - invalid token
         errors.push(`Token at ${currentPath} is missing $value`);
