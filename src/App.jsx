@@ -224,7 +224,7 @@ function App() {
 
           <div className="ml-auto">
             <a
-              href="https://www.designtokens.org/tr/2025.10/"
+              href="https://www.designtokens.org/tr/2025.10/format/"
               target="_blank"
               rel="noopener noreferrer"
               title="Browse official DTCG specification examples"
