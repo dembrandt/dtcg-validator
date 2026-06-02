@@ -141,14 +141,9 @@ function App() {
             <span className="text-sm font-semibold tracking-tight text-content-primary">
               DTCG Validator
             </span>
-            <a
-              href="https://www.designtokens.org/TR/2025.10/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs px-1.5 py-0.5 rounded font-mono bg-surface-card text-content-muted border border-border hover:text-content-secondary hover:border-border-focus transition-colors"
-            >
+            <span className="text-xs px-1.5 py-0.5 rounded font-mono bg-surface-card text-content-muted border border-border">
               2025.10
-            </a>
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -205,15 +200,23 @@ function App() {
             <span className="flex items-center gap-1.5"><TrashIcon />Clear</span>
           </button>
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            <a
+              href="https://www.designtokens.org/TR/2025.10/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-4 py-2 inline-flex items-center gap-1 transition-colors text-content-muted hover:text-content-secondary"
+            >
+              Spec
+              <ExternalLinkIcon />
+            </a>
             <a
               href="https://www.designtokens.org/tr/2025.10/format/"
               target="_blank"
               rel="noopener noreferrer"
-              title="Browse official DTCG specification examples"
               className="text-xs px-4 py-2 inline-flex items-center gap-1 transition-colors text-content-muted hover:text-content-secondary"
             >
-              Official examples
+              Examples
               <ExternalLinkIcon />
             </a>
           </div>
