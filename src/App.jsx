@@ -141,9 +141,14 @@ function App() {
             <span className="text-sm font-semibold tracking-tight text-content-primary">
               DTCG Validator
             </span>
-            <span className="text-xs px-1.5 py-0.5 rounded font-mono bg-surface-card text-content-muted border border-border">
+            <a
+              href="https://www.designtokens.org/TR/2025.10/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-1.5 py-0.5 rounded font-mono bg-surface-card text-content-muted border border-border hover:text-content-secondary hover:border-border-focus transition-colors"
+            >
               2025.10
-            </span>
+            </a>
           </div>
 
           <div className="flex items-center gap-2">
