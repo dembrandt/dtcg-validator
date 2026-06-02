@@ -181,7 +181,7 @@ function App() {
           <button
             onClick={() => setTokenInput(invalidSample)}
             title="Load a token file with intentional errors to see how validation works"
-            className="text-sm px-5 py-2.5 rounded font-medium transition-colors bg-transparent text-red-400 border border-red-900 hover:bg-red-950/40"
+            className="text-sm px-5 py-2.5 rounded font-medium transition-colors bg-transparent text-content-secondary border border-border hover:bg-surface-card hover:text-content-primary"
           >
             Invalid sample
           </button>
