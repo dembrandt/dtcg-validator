@@ -1,2 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+@theme {
+  --color-surface-base: #000000;
+  --color-surface: #0d0d0d;
+  --color-surface-elevated: #1a1a1a;
+  --color-surface-card: #242424;
+  --color-surface-hover: #2b2b2b;
+
+  --color-border: #242424;
+  --color-border-focus: #38bdf8;
+  --color-border-subtle: #1a1a1a;
+
+  --color-content-primary: #ffffff;
+  --color-content-secondary: #8a8f98;
+  --color-content-muted: #5e6772;
+
+  --color-brand-sky: #38bdf8;
+  --color-brand-sky-hover: #75d0fc;
+  --color-brand-orange: #ea580c;
+  --color-brand-orange-hover: #c74b0a;
+
+  --font-family-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
